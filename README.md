@@ -98,7 +98,9 @@ Run the build script on Windows with 64-bit Python 3.11 or 3.12 and internet acc
 .\build-windows.ps1
 ```
 
-The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KITTYSEARCH.exe`. It also creates `dist\SearXNG-source.zip`, which must accompany the EXE to provide the corresponding SearXNG source. The EXE has no installer and no Python, Docker, or WSL prerequisite. Place it in a writable folder and run `KITTYSEARCH.exe`; it opens a native desktop window without a browser. Settings and logs are written to `kittysearch-data` alongside it.
+The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KITTYSEARCH.exe`. The complete release is `dist\KITTYSEARCH-Windows-x64-portable.zip`: it includes the EXE, licenses, corresponding KITTYSEARCH and SearXNG source archives, instructions, build metadata, and SHA256 checksums. Personal settings, learning flags, and downloaded models are excluded from release archives.
+
+Extract the ZIP to a writable folder and run `KITTYSEARCH.exe`; it opens a native desktop window without a browser. The EXE has no installer and no Python, Docker, or WSL prerequisite. Settings, downloaded models, and logs are written to `kittysearch-data` alongside it. Close KITTYSEARCH before moving it, and move that data folder with the EXE to preserve your setup. Keep the corresponding source archives with any redistributed executable. The build script works from any current directory; use `-Python .\.venv\Scripts\python.exe` to build with the project's virtual environment.
 
 The portable EXE includes the local inference runtime; model weights are downloaded separately using the button in Settings. The native SearXNG build tracks upstream `master` by default; pass `-SearXNGBranch` to select another branch. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
 

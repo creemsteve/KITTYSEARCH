@@ -25,7 +25,10 @@ $PythonRoot = Join-Path $BundleRoot 'python'
 $PackageRoot = Join-Path $BundleRoot 'site-packages'
 $Archive = Join-Path $BuildRoot 'searxng-source.zip'
 
-if (Test-Path -LiteralPath $BundleRoot) { Remove-Item -LiteralPath $BundleRoot -Recurse -Force }
+$ResolvedBundle = [System.IO.Path]::GetFullPath($BundleRoot)
+$ExpectedBundle = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'build\searxng-runtime'))
+if ($ResolvedBundle -ne $ExpectedBundle) { throw 'Refusing to remove a runtime outside this project build folder.' }
+if (Test-Path -LiteralPath $ResolvedBundle) { Remove-Item -LiteralPath $ResolvedBundle -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $BuildRoot, $BundleRoot, $PackageRoot | Out-Null
 
 Write-Host "Downloading SearXNG source ($SearXNGBranch)..."
@@ -80,7 +83,9 @@ Write-Host 'Building the one-file KITTYSEARCH executable with SearXNG included..
 if ($LASTEXITCODE -ne 0) { throw 'Could not install the selected inference backend.' }
 & $PythonExe -m pip install -r (Join-Path $PSScriptRoot 'requirements-build.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Could not install PyInstaller.' }
-& $PythonExe -m PyInstaller --noconfirm --clean --onefile --name KITTYSEARCH --windowed --collect-all llama_cpp --add-data "$BundleRoot;searxng-runtime" --add-data "$(Join-Path $PSScriptRoot 'assets');assets" (Join-Path $PSScriptRoot 'kittysearch.py')
+& $PythonExe -m PyInstaller --noconfirm --clean --onefile --name KITTYSEARCH --windowed --distpath $Dist --workpath $BuildRoot --specpath $BuildRoot --collect-all llama_cpp --add-data "$BundleRoot;searxng-runtime" --add-data "$(Join-Path $PSScriptRoot 'assets');assets" (Join-Path $PSScriptRoot 'kittysearch.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
+& $PythonExe (Join-Path $PSScriptRoot 'package-windows.py') --backend $InferenceBackend --searxng-ref $SearXNGBranch
+if ($LASTEXITCODE -ne 0) { throw 'Portable release packaging failed.' }
 Write-Host 'Portable executable created at dist\KITTYSEARCH.exe (SearXNG runtime is embedded).'
-Write-Host 'Distribute dist\SearXNG-source.zip with the executable to provide the corresponding SearXNG source.'
+Write-Host 'Distribute dist\KITTYSEARCH-Windows-x64-portable.zip; it includes the executable, licenses, corresponding source, and checksums.'

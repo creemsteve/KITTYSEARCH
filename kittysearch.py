@@ -294,6 +294,10 @@ WSL_DISTRO = os.environ.get("KITTYSEARCH_WSL_DISTRO", "Ubuntu")
 def wait_for_managed_searxng(cfg: dict[str, Any], *, startup_message: str) -> None:
     deadline = time.time() + 75
     while time.time() < deadline:
+        if MANAGED_PROCESS is not None and MANAGED_PROCESS.poll() is not None:
+            returncode = MANAGED_PROCESS.returncode
+            stop_managed_searxng()
+            raise RuntimeError(f"SearXNG exited during startup (code {returncode}). {startup_message}")
         try:
             http_json(cfg["searxng_url"].rstrip("/") + "/config", timeout=2)
             return
@@ -385,6 +389,11 @@ def start_windows_searxng(cfg: dict[str, Any]) -> None:
     env = os.environ.copy()
     env["SEARXNG_SETTINGS_PATH"] = str(settings.resolve())
     env["PYTHONUTF8"] = "1"
+    cache = data_dir() / "searxng-cache"
+    cache.mkdir(parents=True, exist_ok=True)
+    # SearXNG's default SQLite caches use tempfile.gettempdir(). Keep them
+    # with the portable app instead of sharing the user's system temp cache.
+    env["TEMP"] = env["TMP"] = str(cache.resolve())
     log_path = data_dir() / "searxng-windows.log"
     error_path = data_dir() / "searxng-windows.err.log"
     stdout = log_path.open("a", encoding="utf-8")
@@ -392,7 +401,7 @@ def start_windows_searxng(cfg: dict[str, Any]) -> None:
     try:
         MANAGED_PROCESS = subprocess.Popen([str(python), "-m", "searx.webapp"], cwd=str(source), env=env,
                                            stdout=stdout, stderr=stderr,
-                                           creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+                                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     finally:
         stdout.close()
         stderr.close()
