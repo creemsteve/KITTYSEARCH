@@ -1,13 +1,13 @@
 # KittySearch
 
-KittySearch is a local web interface and CLI for SearXNG. It can send result titles and snippets to a local Ollama model, which scores relevance and source quality and flags pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the UI has an option to hide flagged results.
+KittySearch is a native desktop app and CLI for SearXNG. It can send result titles and snippets to a local Ollama model, which scores relevance and source quality and flags pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the app has an option to hide flagged results.
 
 This repository is distributed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
 
 ## Requirements
 
-- Python 3.10+ to run from source. The application uses only the Python standard library.
-- A SearXNG instance with its JSON search format enabled.
+- Python 3.10+ with Tk support to run from source. The application uses only the Python standard library.
+- By default, a SearXNG instance with its JSON search format enabled. The desktop app can start SearXNG automatically in Docker, or run its Python app natively on Windows without Docker or WSL.
 - Optional: Ollama with a model pulled locally. The model does not need Internet access after installation.
 
 The app does not send search result text to a hosted AI service. It sends query text and result snippets to the configured local Ollama endpoint. Search queries go to the configured SearXNG instance, which may in turn contact upstream search engines according to its configuration.
@@ -15,26 +15,23 @@ The app does not send search result text to a hosted AI service. It sends query 
 ## Run
 
 ```powershell
-python kittysearch.py serve --open
+python kittysearch.py
 ```
 
 ```bash
-python3 kittysearch.py serve --open
+python3 kittysearch.py
 ```
 
-Open `http://127.0.0.1:8787`. Press Ctrl+C to stop.
-
-The interface includes Telnet and serial-terminal tabs. Telnet connects to a host and TCP port (default 23). The serial tab lists detected COM ports on Windows and common `/dev` serial devices on Linux. Auto-detect probes common baud rates and scores incoming text; the device must already be transmitting readable output. A silent device cannot reveal its baud rate. Probing opens the port repeatedly and can reset boards wired to reset on DTR. Serial uses 8 data bits, no parity, and 1 stop bit.
-
-Telnet is unencrypted. Use it only on trusted networks; prefer SSH for remote administrative access.
+The native window includes Search and Settings tabs. Close the window to stop KittySearch.
 
 ## Configure
 
-On first launch the app creates `kittysearch-data/config.json` next to the source file, or next to the frozen executable. Example:
+On first launch the app creates `kittysearch-data/config.json` next to the source file, or next to the frozen executable. Connection settings can be edited from the **Settings** tab and are saved to this file. Example:
 
 ```json
 {
   "searxng_url": "http://127.0.0.1:8080",
+  "searxng_mode": "external",
   "ollama_url": "http://127.0.0.1:11434",
   "model": "qwen2.5:7b",
   "results": 20,
@@ -42,7 +39,29 @@ On first launch the app creates `kittysearch-data/config.json` next to the sourc
 }
 ```
 
-You can set `KITTYSEARCH_HOME`, `KITTYSEARCH_SEARXNG_URL`, `KITTYSEARCH_OLLAMA_URL`, and `KITTYSEARCH_MODEL` instead. Command-line configuration checks:
+Choose the Docker mode in Settings to have KittySearch run the official `searxng/searxng` container on startup and stop it when KittySearch exits. Docker downloads the image the first time. This mode uses the configured loopback SearXNG URL and writes a local SearXNG settings file beside `config.json`.
+
+### Native Windows setup without Docker or WSL
+
+SearXNG does not officially support native Windows. The KittySearch EXE bundles its own SearXNG source, dependencies, and embedded Python runtime, so end users do not need Python, Docker, or WSL installed for search. On a fresh EXE setup, KittySearch starts its bundled SearXNG automatically at `http://127.0.0.1:8080`. You can change this under Connection settings.
+
+When running KittySearch from source, native setup requires 64-bit Python 3.11 or 3.12 and internet access during installation. From the KittySearch folder, run:
+
+```powershell
+.\setup-searxng-windows.ps1
+```
+
+The script downloads SearXNG source, creates an isolated virtual environment, installs its Python requirements, and creates local settings with a generated secret key. It does not install Docker, WSL, or packages into your system Python. SearXNG source and logs are stored under `kittysearch-data\searxng-windows`; its settings are stored beside KittySearch's `config.json`.
+
+In KittySearch **Settings**, choose the native Windows mode and use `http://127.0.0.1:8080`. KittySearch starts SearXNG when it launches and stops it when KittySearch exits. To select a Python executable explicitly, pass `-Python` (for example `-Python py`). To install a specific upstream branch or ref, pass `-Ref`.
+
+SearXNG changes frequently and native Windows operation is not covered by upstream support. If an upstream update breaks the compatibility patch, rerun the setup script after removing `kittysearch-data\searxng-windows\source` to fetch a clean source tree. The setup preserves the local settings file.
+
+For an existing WSL setup, choose **Start SearXNG automatically (Windows WSL2, no Docker)** and keep the SearXNG URL at `http://127.0.0.1:8080`. Run `setup-searxng-wsl.ps1` to install it in Ubuntu. The upstream Linux installation guide is [here](https://docs.searxng.org/admin/installation-searxng); keep `json` enabled in `search.formats`.
+
+Choose **Connect to an existing SearXNG** to use an instance managed separately.
+
+You can set `KITTYSEARCH_HOME`, `KITTYSEARCH_SEARXNG_URL`, `KITTYSEARCH_OLLAMA_URL`, and `KITTYSEARCH_MODEL` instead. Environment variables take precedence over the saved values when KittySearch starts. Command-line configuration checks:
 
 ```bash
 python kittysearch.py doctor
@@ -69,21 +88,19 @@ Set `"model": "qwen2.5:7b"` in `kittysearch-data/config.json`. Ollama serves its
 
 ## SearXNG and cross-platform setup
 
-KittySearch itself runs on Windows and Linux. Run SearXNG separately using its supported deployment method (commonly a Linux host or container) and point KittySearch at its address. Ollama can run locally on Windows or Linux. Keep the endpoints on loopback unless you intentionally operate trusted services on another machine.
+KittySearch runs on Windows and Linux. On Windows, use the native setup above, WSL2, Docker, or point it at an existing SearXNG instance. Native Windows SearXNG is a compatibility setup and is not an upstream supported platform. On Linux, use SearXNG's supported installation methods or Docker mode. Ollama can run locally on Windows or Linux. Keep the endpoints on loopback unless you intentionally operate trusted services on another machine.
 
 ## Build a portable Windows EXE
 
-Install PyInstaller on Windows, then run:
+Run the build script on Windows with 64-bit Python 3.11 or 3.12 and internet access:
 
 ```powershell
-python -m pip install -r requirements-build.txt
-.
-build-windows.ps1
+.\build-windows.ps1
 ```
 
-The output is `dist\KittySearch.exe`, a PyInstaller one-file executable with the Python runtime and KittySearch application bundled. Place it in a writable folder and run `KittySearch.exe serve --open`; its settings are written to `kittysearch-data` alongside it. The EXE has no installer and no Python prerequisite.
+The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KittySearch.exe`. It also creates `dist\SearXNG-source.zip`, which must accompany the EXE to provide the corresponding SearXNG source. The EXE has no installer and no Python, Docker, or WSL prerequisite. Place it in a writable folder and run `KittySearch.exe`; it opens a native desktop window without a browser. Settings and logs are written to `kittysearch-data` alongside it.
 
-The EXE encapsulates KittySearch, including the Telnet and serial terminal clients, not SearXNG or Ollama/model weights. Those are independent services and are kept separately so the same app can run on both operating systems. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
+Ollama and its model weights remain separate optional services. The native SearXNG build tracks upstream `master` by default; pass `-SearXNGBranch` to select another branch. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
 
 ## Notes on AI-authorship screening
 
