@@ -1,16 +1,20 @@
-# KittySearch
+# KITTYSEARCH
 
-KittySearch is a native desktop app and CLI for SearXNG. It can send result titles and snippets to a local Ollama model, which scores relevance and source quality and flags pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the app has an option to hide flagged results.
+KITTYSEARCH is a native desktop app and CLI for SearXNG. It can run a local GGUF language model directly inside the application to score relevance and source quality and flag pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the app has an option to hide flagged results.
 
 This repository is distributed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
 
 ## Requirements
 
-- Python 3.10+ with Tk support to run from source. The application uses only the Python standard library.
-- By default, a SearXNG instance with its JSON search format enabled. The desktop app can start SearXNG automatically in Docker, or run its Python app natively on Windows without Docker or WSL.
-- Optional: Ollama with a model pulled locally. The model does not need Internet access after installation.
+- Python 3.10+ with Tk support to run from source. Search uses only the Python standard library.
+- By default, a SearXNG instance with its JSON search format enabled. The desktop app starts its local Windows instance automatically when needed.
+- Optional for AI review: `llama-cpp-python` and a compatible GGUF model file. Both run locally; no model server is used.
 
-The app does not send search result text to a hosted AI service. It sends query text and result snippets to the configured local Ollama endpoint. Search queries go to the configured SearXNG instance, which may in turn contact upstream search engines according to its configuration.
+The app does not send search result text to a hosted AI service. Query text and result snippets are passed to the locally loaded model in the KITTYSEARCH process. Search queries go to the configured SearXNG instance, which may in turn contact upstream search engines according to its configuration.
+
+## AI-assisted development
+
+Generative AI tools have been used to help develop KITTYSEARCH, including writing and revising code, investigating bugs, and drafting documentation. The project maintainer guides the work and is responsible for reviewing and maintaining the resulting changes. AI-assisted work can contain errors, so review the source and verify behavior before relying on it. This development use is separate from KITTYSEARCH's optional local model features described below.
 
 ## Run
 
@@ -22,54 +26,36 @@ python kittysearch.py
 python3 kittysearch.py
 ```
 
-The native window includes Search and Settings tabs. Close the window to stop KittySearch.
+The native window includes Search, Learning, Settings (local AI model), and SearXNG settings tabs. Close the window to stop KITTYSEARCH.
 
-## Configure
+The GUI uses [IBM Carbon's Gray 100 dark theme](https://carbondesignsystem.com/building-blocks/foundations/themes/overview) and bundled IBM Plex Sans Regular, SemiBold, and Italic fonts. Source runs and portable Windows/Linux builds load the fonts privately for the application; no font installation or runtime download is required. Font files and their SIL Open Font License are included in `assets/fonts` (see its provenance README).
 
-On first launch the app creates `kittysearch-data/config.json` next to the source file, or next to the frozen executable. Connection settings can be edited from the **Settings** tab and are saved to this file. Example:
+## Automatic setup
 
-```json
-{
-  "searxng_url": "http://127.0.0.1:8080",
-  "searxng_mode": "external",
-  "ollama_url": "http://127.0.0.1:11434",
-  "model": "qwen2.5:7b",
-  "results": 20,
-  "timeout": 20
-}
-```
+The desktop app defaults to a local SearXNG at `http://127.0.0.1:8080`; on Windows it starts the bundled or locally installed instance if needed. On Linux, run a SearXNG instance at that address with JSON enabled, or select Docker in **SearXNG settings**.
 
-Choose the Docker mode in Settings to have KittySearch run the official `searxng/searxng` container on startup and stop it when KittySearch exits. Docker downloads the image the first time. This mode uses the configured loopback SearXNG URL and writes a local SearXNG settings file beside `config.json`.
+Open **SearXNG settings** to set the base URL, startup mode, and request timeout (1–300 seconds). **Test connection** checks the URL currently entered without saving or starting a server. **Save SearXNG settings** applies changes and saves them in `kittysearch-data/desktop-searxng.json`. Changing the URL or mode stops any instance started by KITTYSEARCH before applying the new connection. Existing instances are never stopped by KITTYSEARCH. Native Windows and WSL2 modes use port 8080; Docker supports other loopback HTTP ports. Existing instance mode supports HTTP or HTTPS servers, including a base path. WSL2 requires `setup-searxng-wsl.ps1`; Docker requires a running Docker installation.
 
-### Native Windows setup without Docker or WSL
+The SearXNG settings tab also includes:
 
-SearXNG does not officially support native Windows. The KittySearch EXE bundles its own SearXNG source, dependencies, and embedded Python runtime, so end users do not need Python, Docker, or WSL installed for search. On a fresh EXE setup, KittySearch starts its bundled SearXNG automatically at `http://127.0.0.1:8080`. You can change this under Connection settings.
+- **Search options:** language (`all`, `auto`, or a code such as `en-US`), SafeSearch (Off, Moderate, Strict), and comma-separated categories. SafeSearch depends on engine support, and server rules may override preferences.
+- **Engines:** click **Load engines** to discover the current server's engine names, categories, and defaults. Hold Ctrl to select multiple engines, then click **Use selected** and save. You can also enter names separated by commas. Blank uses server defaults. With an explicit engine list, only chosen engines supporting your categories are requested. Unknown engines or categories stop the search instead of silently using defaults. This uses SearXNG's [search request handling](https://github.com/searxng/searxng/blob/master/searx/webadapter.py); engine choices apply to KITTYSEARCH searches and do not change the server's global configuration.
+- **Sites:** comma-separated allowed and blocked domains. Blank allowed domains permits all sites; blocked domains always win. A domain includes its subdomains, with internationalized names supported. Enter hostnames such as `example.org`, without URL schemes, paths, ports, or wildcards.
 
-When running KittySearch from source, native setup requires 64-bit Python 3.11 or 3.12 and internet access during installation. From the KittySearch folder, run:
+Domain rules filter results locally before applying the result limit and running AI review. Saved rules also filter currently displayed results; run a new search to restore results after loosening a rule. They do **not** prevent SearXNG from contacting sites or fetching resources. Enforce network access policies in the server or firewall. Use the settings controls instead of `!engine`, `!!` redirect, or `:language` query shortcuts, which KITTYSEARCH rejects so they cannot override saved choices. Settings files from the earlier connection-only interface are loaded with general search, all languages, Moderate SafeSearch, server-default engines, and no domain filters.
 
-```powershell
-.\setup-searxng-windows.ps1
-```
+Local model and acceleration choices are saved separately in `kittysearch-data/desktop-model.json`. The desktop app does not import the CLI configuration or settings saved by older versions.
 
-The script downloads SearXNG source, creates an isolated virtual environment, installs its Python requirements, and creates local settings with a generated secret key. It does not install Docker, WSL, or packages into your system Python. SearXNG source and logs are stored under `kittysearch-data\searxng-windows`; its settings are stored beside KittySearch's `config.json`.
+For Windows source installations, run `./setup-searxng-windows.ps1` first. The portable Windows build includes SearXNG. SearXNG does not officially support native Windows.
 
-In KittySearch **Settings**, choose the native Windows mode and use `http://127.0.0.1:8080`. KittySearch starts SearXNG when it launches and stops it when KittySearch exits. To select a Python executable explicitly, pass `-Python` (for example `-Python py`). To install a specific upstream branch or ref, pass `-Ref`.
-
-SearXNG changes frequently and native Windows operation is not covered by upstream support. If an upstream update breaks the compatibility patch, rerun the setup script after removing `kittysearch-data\searxng-windows\source` to fetch a clean source tree. The setup preserves the local settings file.
-
-For an existing WSL setup, choose **Start SearXNG automatically (Windows WSL2, no Docker)** and keep the SearXNG URL at `http://127.0.0.1:8080`. Run `setup-searxng-wsl.ps1` to install it in Ubuntu. The upstream Linux installation guide is [here](https://docs.searxng.org/admin/installation-searxng); keep `json` enabled in `search.formats`.
-
-Choose **Connect to an existing SearXNG** to use an instance managed separately.
-
-You can set `KITTYSEARCH_HOME`, `KITTYSEARCH_SEARXNG_URL`, `KITTYSEARCH_OLLAMA_URL`, and `KITTYSEARCH_MODEL` instead. Environment variables take precedence over the saved values when KittySearch starts. Command-line configuration checks:
+The command line retains its independent `kittysearch-data/config.json` and supports `KITTYSEARCH_HOME`, `KITTYSEARCH_SEARXNG_URL`, and `KITTYSEARCH_MODEL_PATH`. Commands include:
 
 ```bash
 python kittysearch.py doctor
 python kittysearch.py search "how do heat pumps work" --limit 10
-python kittysearch.py search "clinical guideline query" --json
 ```
 
-SearXNG's `search.formats` setting must include `html` and `json`; some default setups disable JSON. Point KittySearch at the SearXNG base URL (not `/search`). SearXNG documents its [HTTP Search API](https://docs.searxng.org/dev/search_api) and [container setup](https://docs.searxng.org/admin/installation-docker). For example, in a SearXNG settings file:
+SearXNG's `search.formats` setting must include `html` and `json`; some default setups disable JSON. Point KITTYSEARCH at the SearXNG base URL (not `/search`). SearXNG documents its [HTTP Search API](https://docs.searxng.org/dev/search_api) and [container setup](https://docs.searxng.org/admin/installation-docker). For example, in a SearXNG settings file:
 
 ```yaml
 search:
@@ -78,17 +64,31 @@ search:
     - json
 ```
 
-For Ollama, install it for [Windows](https://ollama.com/download/windows) or [Linux](https://ollama.com/download/linux), then pull and configure a local model:
+### Local model
 
-```bash
-ollama pull qwen2.5:7b
+Open **Settings** to choose a model, then click **Download & use model**. Available downloads are [IBM Granite 4.2 3B Q4_K_M](https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF) (2.24 GB), [Qwen 2.5 1.5B Instruct Q4_K_M](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF) (1.12 GB), and [Llama 3.2 3B Instruct Q4_K_M](https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF) (2.02 GB). **Model details & license** opens the selected model's source. Each download uses a pinned revision and SHA256 verification before installation in `kittysearch-data/models`; failed downloads leave installed files intact. You can also choose **Local GGUF file…** and browse to another compatible instruct model.
+
+Use **Use model & save settings** to switch between installed models and save inference options. Changes apply to the next search. The old model is unloaded before loading its replacement. Before a download, or if inference fails, search uses lexical ranking and reports the problem.
+
+Enable **kitty mode :3** in **Settings**, then click **Use model & save settings** to ask the local LLM to talk like a playful therian catgirl in its result explanations. It is off by default and saved with your model settings. The directive applies to the next search and keeps the required review format and evidence-based scoring instructions.
+
+**Hardware acceleration** offers **Auto**, **CPU only**, and **GPU offload**, with GPU layer count (`-1` = all, `0` = CPU), GPU device index, CPU thread count, and context size. Auto uses offload when the installed runtime supports it and retries on CPU if GPU loading fails. Explicit GPU mode reports an error instead of silently using CPU. Search status reports the runtime choice or fallback.
+
+**This computer & model fit** detects CPU threads, total/available RAM, graphics, VRAM when available, free disk space, and runtime GPU support. Selecting a model shows estimated memory needs, likely CPU/GPU fit, low-memory warnings, and speed/quality tradeoffs. Context size changes the memory estimate. These are conservative heuristics, not measured tokens/second or model-quality benchmarks. Missing VRAM information is shown as unknown; shared graphics memory is not assumed to be dedicated VRAM. **Refresh hardware** updates the snapshot as other apps consume memory.
+
+When running from source, install the inference runtime in the same Python environment with `python -m pip install -r requirements-model.txt`. The packaged builds include the runtime. The model evaluates snippets, not full pages; check its scores and reasons against the sources.
+
+For GPU acceleration, install a matching runtime and restart KITTYSEARCH (a CPU-only runtime cannot enable GPU offload through a setting):
+
+```powershell
+python install-model-runtime.py --backend vulkan
+# NVIDIA alternative; choose a CUDA wheel compatible with your GPU/driver:
+python install-model-runtime.py --backend cuda --cuda-version cu130
 ```
 
-Set `"model": "qwen2.5:7b"` in `kittysearch-data/config.json`. Ollama serves its local API at `http://127.0.0.1:11434`. Model quality and speed vary by hardware. If Ollama is not configured or available, KittySearch still sorts results with a lightweight lexical/domain heuristic and clearly reports that AI review did not run.
+The installer selects prebuilt wheels from the [llama-cpp-python backend indexes](https://llama-cpp-python.readthedocs.io/en/latest/) and fails if no matching wheel exists for your Python/platform. Vulkan supports compatible NVIDIA, AMD and Intel graphics; CUDA requires compatible NVIDIA hardware and drivers. On macOS, `--backend metal` is available. `--backend cpu` restores the CPU runtime. Source builds of additional backends can follow the upstream instructions.
 
-## SearXNG and cross-platform setup
-
-KittySearch runs on Windows and Linux. On Windows, use the native setup above, WSL2, Docker, or point it at an existing SearXNG instance. Native Windows SearXNG is a compatibility setup and is not an upstream supported platform. On Linux, use SearXNG's supported installation methods or Docker mode. Ollama can run locally on Windows or Linux. Keep the endpoints on loopback unless you intentionally operate trusted services on another machine.
+Portable builds default to CPU for compatibility. To include a GPU runtime on Windows, run `./build-windows.ps1 -InferenceBackend vulkan` or `./build-windows.ps1 -InferenceBackend cuda -CudaVersion cu130`. On Linux, run `KITTYSEARCH_INFERENCE_BACKEND=vulkan ./build-linux.sh`; CUDA builds also accept `KITTYSEARCH_CUDA_VERSION=cu130`. Build in a dedicated Python environment because backend selection replaces its inference runtime.
 
 ## Build a portable Windows EXE
 
@@ -98,10 +98,20 @@ Run the build script on Windows with 64-bit Python 3.11 or 3.12 and internet acc
 .\build-windows.ps1
 ```
 
-The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KittySearch.exe`. It also creates `dist\SearXNG-source.zip`, which must accompany the EXE to provide the corresponding SearXNG source. The EXE has no installer and no Python, Docker, or WSL prerequisite. Place it in a writable folder and run `KittySearch.exe`; it opens a native desktop window without a browser. Settings and logs are written to `kittysearch-data` alongside it.
+The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KITTYSEARCH.exe`. It also creates `dist\SearXNG-source.zip`, which must accompany the EXE to provide the corresponding SearXNG source. The EXE has no installer and no Python, Docker, or WSL prerequisite. Place it in a writable folder and run `KITTYSEARCH.exe`; it opens a native desktop window without a browser. Settings and logs are written to `kittysearch-data` alongside it.
 
-Ollama and its model weights remain separate optional services. The native SearXNG build tracks upstream `master` by default; pass `-SearXNGBranch` to select another branch. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
+The portable EXE includes the local inference runtime; model weights are downloaded separately using the button in Settings. The native SearXNG build tracks upstream `master` by default; pass `-SearXNGBranch` to select another branch. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
 
 ## Notes on AI-authorship screening
 
-Authorship cannot be reliably determined from a search snippet alone. KittySearch only applies an AI penalty when the local model identifies direct evidence in the supplied snippet/title with adequate confidence, or a narrow explicit phrase heuristic matches. It does not treat general AI usage by a publisher as proof that a particular page was generated. Review the evidence before relying on an AI flag.
+Authorship cannot be reliably determined from a search snippet alone. Automatic screening applies an AI penalty only when a narrow explicit phrase heuristic matches the supplied snippet/title. A model claim alone does not establish authorship. It does not treat general AI usage by a publisher as proof that a particular page was generated. Review the evidence before relying on an AI flag. Your saved flags also affect ranking as described below.
+
+## Learning from your flags
+
+Select a search result and choose **Flag page as AI** or **Flag website as AI**. KITTYSEARCH remembers your choice, labels matching results **Flagged by you**, lowers their ranking, and includes them in **Hide likely AI-generated results**. Changes apply immediately and on future searches, even without a downloaded model. Repeated flags do not accumulate penalties.
+
+The **Learning** tab lists all saved flags, lets you flag a URL directly, and lets you remove flags even when their results are hidden. You can also use **Unflag page** or **Unflag website** on a selected result. Removing a flag restores the original review and ranking; automatic AI evidence can still flag the result.
+
+Page flags match the URL path and query, ignoring fragments, host capitalization, and default ports. Website flags match the exact hostname across HTTP/HTTPS and ports; they do not include other subdomains (`www.example.com` and `example.com` are separate). A website flag covers every page on that host, so use a page flag for a single article.
+
+Flags are personal preferences stored in `kittysearch-data/learning.sqlite3` (or `KITTYSEARCH_HOME`), shared by desktop and CLI searches. They are never uploaded and do not retrain the local language model.

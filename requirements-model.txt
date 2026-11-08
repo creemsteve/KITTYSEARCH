@@ -1,0 +1,4 @@
+# Optional in-process GGUF inference runtime. Install separately from the
+# lightweight search application when local model review is wanted.
+# For a GPU runtime, use install-model-runtime.py --backend vulkan (or cuda/metal).
+llama-cpp-python>=0.3,<1

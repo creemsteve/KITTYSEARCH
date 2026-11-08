@@ -24,5 +24,5 @@ if ($LASTEXITCODE -ne 0) {
     throw 'SearXNG setup failed inside WSL. Review the error above and rerun this script after resolving it.'
 }
 
-Write-Host "Setup complete. In KittySearch, choose the WSL2 mode and keep the SearXNG URL at http://127.0.0.1:8080."
-Write-Host "If you selected a non-default distro, set KITTYSEARCH_WSL_DISTRO=$Distro before launching KittySearch."
+Write-Host "Setup complete. In KITTYSEARCH, choose the WSL2 mode and keep the SearXNG URL at http://127.0.0.1:8080."
+Write-Host "If you selected a non-default distro, set KITTYSEARCH_WSL_DISTRO=$Distro before launching KITTYSEARCH."

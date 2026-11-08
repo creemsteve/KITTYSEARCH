@@ -76,4 +76,4 @@ esac
 EOF
 chmod 700 "$CONTROL"
 
-echo 'SearXNG installed. Start it from KittySearch using the WSL2 mode.'
+echo 'SearXNG installed. Start it from KITTYSEARCH using the WSL2 mode.'

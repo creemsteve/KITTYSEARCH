@@ -70,5 +70,5 @@ search:
     - json
 "@ | Set-Content -LiteralPath $Settings -Encoding UTF8
 }
-Write-Host "Native SearXNG setup is ready. In KittySearch select native Windows mode and use http://127.0.0.1:8080."
+Write-Host "Native SearXNG setup is ready. In KITTYSEARCH select native Windows mode and use http://127.0.0.1:8080."
 Write-Host "Logs will be written under: $DataRoot"
