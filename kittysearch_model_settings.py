@@ -101,10 +101,10 @@ class ModelSettingsMixin:
         self.kitty_mode_toggle = ttk.Checkbutton(f, text="kitty mode :3", variable=self.kitty_mode)
         self.kitty_mode_toggle.pack(anchor="w", pady=(4, 0))
         hint("Ask the local AI to talk like a playful therian catgirl in result explanations. "
-             "Save settings to apply this voice to the next search.")
+             "Save settings to apply this voice to the next claw.")
         self.save_model_button = ttk.Button(f, text="Use model & save settings", command=self._save_model_settings, style="Primary.TButton")
         self.save_model_button.pack(anchor="w")
-        self.model_settings_status = hint("Changes apply to the next search; an active search keeps its current settings.")
+        self.model_settings_status = hint("Changes apply to the next claw; an active claw keeps its current settings.")
         hardware_panel = ttk.Frame(f)
         hardware_panel.pack(fill="x", before=acceleration_divider, pady=(4, 8))
         row = ttk.Frame(hardware_panel)
@@ -174,7 +174,7 @@ class ModelSettingsMixin:
             return
         self.cfg = dict(self.cfg, **values)
         installed = core.Path(values["model_path"]).is_file()
-        self.model_settings_status.configure(text="Settings saved. The next search will load this model." if installed else "Settings saved. Download this model to enable AI review.")
+        self.model_settings_status.configure(text="Settings saved. The next claw will load this model." if installed else "Settings saved. Download this model to enable AI review.")
         self._update_model_status()
         self._refresh_health()
 
@@ -236,7 +236,7 @@ class ModelSettingsMixin:
             return
         self.cfg = dict(self.cfg, **values)
         self._update_model_status()
-        self.model_settings_status.configure(text="Download verified. Model selected for the next search.")
+        self.model_settings_status.configure(text="Download verified. Model selected for the next claw.")
         self._refresh_health()
 
     def _model_download_failed(self, message):

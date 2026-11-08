@@ -38,7 +38,25 @@ class LocalReviewTests(unittest.TestCase):
         self.assertEqual(set(result), {"0", "1", "2"})
         self.assertEqual(len(model.calls), 2)
         self.assertIn("untrusted data", model.calls[0]["messages"][0]["content"])
-        self.assertEqual(model.calls[0]["response_format"], {"type": "json_object"})
+        self.assertEqual(model.calls[0]["response_format"], core.review_response_format(["0", "1"]))
+        self.assertEqual(model.calls[1]["response_format"], core.review_response_format(["2"]))
+        self.assertEqual(model.calls[0]["max_tokens"], 768)
+
+    def test_generation_schema_requires_each_id_and_all_typed_fields(self):
+        schema = core.review_response_format(["3", "4"])["schema"]
+        self.assertEqual(schema["required"], ["results"])
+        array = schema["properties"]["results"]
+        self.assertEqual((array["minItems"], array["maxItems"]), (2, 2))
+        self.assertFalse(array["additionalItems"])
+        for result_id, entry in zip(["3", "4"], array["items"]):
+            self.assertEqual(set(entry["required"]), set(review(result_id)))
+            self.assertFalse(entry["additionalProperties"])
+            properties = entry["properties"]
+            self.assertEqual(properties["id"], {"const": result_id})
+            for field in ("quality", "relevance", "confidence"):
+                self.assertEqual(properties[field]["enum"], list(range(101)))
+            self.assertEqual(properties["ai_generated"]["type"], "boolean")
+            self.assertEqual(properties["reason"]["maxLength"], 180)
 
     def test_kitty_mode_directive_applies_to_every_batch_and_can_be_disabled(self):
         answers = [response([review(0), review(1)]), response([review(2)])]
@@ -54,7 +72,7 @@ class LocalReviewTests(unittest.TestCase):
             self.assertIn("therian catgirl", call["messages"][0]["content"])
             self.assertEqual(call["messages"][1]["role"], "user")
             self.assertIn("untrusted data", call["messages"][1]["content"])
-            self.assertEqual(call["response_format"], {"type": "json_object"})
+            self.assertIn("schema", call["response_format"])
         for call in model.calls[2:]:
             self.assertEqual(len(call["messages"]), 1)
             self.assertEqual(call["messages"][0]["role"], "user")
@@ -73,6 +91,20 @@ class LocalReviewTests(unittest.TestCase):
         self.assertTrue(result["analyzed"])
         self.assertIn("reviewed 1 of 3", result["model_error"])
         self.assertEqual(sum(item["kitty_ai_reviewed"] for item in result["results"]), 1)
+
+    def test_truncated_response_reports_output_limit(self):
+        answer = {"choices": [{"message": {"content": '{"results":['}, "finish_reason": "length"}]}
+        with patch.object(core, "get_local_model", return_value=FakeModel([answer])):
+            with self.assertRaisesRegex(ValueError, "output token limit"):
+                core.analyze_with_local_model("query", self.items[:2], self.cfg)
+
+    def test_empty_or_wrong_shape_responses_explain_the_failure(self):
+        for answer, message in (({"choices": []}, "not complete JSON"),
+                                ({"choices": [{"message": {"content": None}}]}, "not complete JSON"),
+                                ({"choices": [{"message": {"content": '{}'}}]}, "results array")):
+            with self.subTest(answer=answer), patch.object(core, "get_local_model", return_value=FakeModel([answer])):
+                with self.assertRaisesRegex(ValueError, message):
+                    core.analyze_with_local_model("query", self.items[:2], self.cfg)
 
     def test_model_failure_uses_lexical_ranking(self):
         with patch.object(core, "get_local_model", side_effect=RuntimeError("runtime unavailable")), patch.object(core, "http_json", return_value={"results": self.items}):

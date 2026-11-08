@@ -1,3 +1,25 @@
 # Agent instructions
 
 - Capitalize the project name as `KITTYSEARCH` in prose and other mentions. Preserve different casing only when required in code, such as identifiers, filenames, commands, or existing APIs.
+
+## Windows portable builds and releases
+
+- Build on Windows with 64-bit Python 3.11 or 3.12 in a dedicated virtual environment. Backend installation replaces that environment's `llama-cpp-python` runtime. Do not use a system Python environment for release builds.
+- The Windows default is **Vulkan**, covering compatible NVIDIA, AMD, and Intel graphics. Also offer a separate **CUDA** variant for compatible NVIDIA GPUs and a **CPU** variant for machines without the required GPU driver. Never describe a CPU-only EXE as supporting GPU offload.
+- Use separate output directories for each variant. From the repository root:
+
+  ```powershell
+  .\build-windows.ps1 -Python .\.venv\Scripts\python.exe -InferenceBackend vulkan -DistDirectory dist/vulkan
+  .\build-windows.ps1 -Python .\.venv\Scripts\python.exe -InferenceBackend cuda -CudaVersion cu130 -DistDirectory dist/cuda
+  .\build-windows.ps1 -Python .\.venv\Scripts\python.exe -InferenceBackend cpu -DistDirectory dist/cpu
+  ```
+
+- Select CUDA wheels for the target NVIDIA GPU architecture and driver. CUDA 13 wheels support compute capability 7.5 or newer, including RTX 50-series GPUs. Verify current upstream wheel compatibility when changing CUDA versions; do not assume an older CUDA wheel supports a newer GPU. Vulkan requires a Vulkan-capable graphics driver; CUDA requires a compatible NVIDIA driver. End users should not need Python, a compiler, or a GPU SDK.
+- Use `install-model-runtime.py` and the upstream backend-specific wheel index. Never silently replace a requested Vulkan/CUDA wheel with a CPU wheel. Preserve `--collect-all llama_cpp` so native backend DLLs and their redistributable dependencies are packaged. GPU drivers remain an end-user prerequisite.
+- Windows CUDA wheels also require NVIDIA cuBLAS DLLs that the upstream inference wheel does not include. The installer installs the matching NVIDIA package (`nvidia-cublas` for CUDA 13, `nvidia-cublas-cu12` for CUDA 12, or `nvidia-cublas-cu11` for CUDA 11), stages `cublas64_*.dll`, `cublasLt64_*.dll`, and `NVIDIA-cuBLAS-LICENSE.txt` beside `llama.dll`, and removes these staged files when switching backends. Keep both DLLs and the license in CUDA EXEs. Never rely on a locally installed CUDA Toolkit or `CUDA_PATH` to supply missing release files.
+- Both the freshly installed runtime and the **finished portable EXE** must pass the backend check. The build runs `KITTYSEARCH.exe runtime-check --backend <backend> --output <report.json>` without starting the GUI or SearXNG. GPU builds must report GPU support and contain their backend DLL; CPU builds must report CPU-only support. A failed check must stop packaging.
+- `package-windows.py` requires `runtime-check.json` from the finished EXE, matched to its SHA256 and selected backend. Do not bypass this gate. `build-info.json` must retain the runtime check, native library inventory, backend, and CUDA version when applicable. `START-HERE.txt` must describe the actual backend and driver requirements.
+- Distribute the backend-labelled ZIP and its `.zip.sha256` file: `KITTYSEARCH-Windows-x64-vulkan-portable.zip`, `KITTYSEARCH-Windows-x64-cuda-cu130-portable.zip`, or `KITTYSEARCH-Windows-x64-cpu-portable.zip`. Include the executable, licenses, corresponding KITTYSEARCH and SearXNG sources, instructions, metadata, and file checksums. Exclude personal `kittysearch-data`, settings, logs, credentials, and model weights.
+- Before publishing, run `.\.venv\Scripts\python.exe -m unittest discover -s tests`, inspect each ZIP and its checksums, and run the extracted EXE's runtime check in a clean directory without relying on the development environment. When compatible hardware and a GGUF model are available, also smoke-test actual GPU model loading and generation with `KITTYSEARCH.exe runtime-check --backend <backend> --model "C:\path\to\model.gguf" --output smoke-test.json`; require `ok: true`, nonzero completion tokens, and GPU status for GPU variants. This uses explicit GPU mode, so CPU fallback cannot hide a broken GPU build. Report any hardware validation that could not be performed.
+- Portable EXEs use an embedded runtime. Host `pip install` commands cannot add CUDA/Vulkan support to an existing EXE. For older CPU-only releases showing **GPU offload is unavailable**, advise selecting **Auto** or **CPU only**, or replacing the EXE with a GPU-enabled variant while preserving `kittysearch-data`. Explicit GPU mode must report an unavailable backend; Auto may retry failed GPU model loading on CPU. A GPU runtime that cannot load because its required driver is absent needs the CPU variant.
+- Keep these instructions and README build instructions in sync when build defaults, backend support, checks, or release filenames change. Do not publish or replace GitHub release assets unless the user has authorized publication.

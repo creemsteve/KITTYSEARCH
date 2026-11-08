@@ -135,6 +135,38 @@ def runtime_capabilities() -> dict[str, Any]:
         return {"installed": False, "gpu": False, "detail": str(exc)}
 
 
+def check_runtime(backend: str) -> dict[str, Any]:
+    """Check the loaded runtime, including native backend DLLs in Windows builds."""
+    report = dict(runtime_capabilities(), backend=backend)
+    report["ok"] = report["installed"] and report["gpu"] == (backend != "cpu")
+    if report["installed"]:
+        runtime = importlib.import_module("llama_cpp")
+        library_root = Path(runtime.__file__).parent / "lib"
+        report["native_libraries"] = sorted(p.name for p in library_root.iterdir()
+                                             if p.suffix in (".dll", ".so", ".dylib"))
+        if sys.platform == "win32":
+            required = {"llama.dll", "ggml.dll", "ggml-base.dll", "ggml-cpu.dll"}
+            if backend in ("vulkan", "cuda"):
+                required.add(f"ggml-{backend}.dll")
+            report["missing_libraries"] = sorted(required - set(report["native_libraries"]))
+            if backend == "cuda":
+                for prefix in ("cublas64_", "cublasLt64_"):
+                    if not any(name.startswith(prefix) for name in report["native_libraries"]):
+                        report["missing_libraries"].append(prefix + "*.dll")
+                if not (library_root / "NVIDIA-cuBLAS-LICENSE.txt").is_file():
+                    report["missing_libraries"].append("NVIDIA-cuBLAS-LICENSE.txt")
+            report["ok"] = report["ok"] and not report["missing_libraries"]
+    return report
+
+
+def gpu_runtime_help() -> str:
+    if getattr(sys, "frozen", False):
+        return ("Use a Vulkan or CUDA portable build of KITTYSEARCH with a compatible graphics driver, "
+                "or select Auto/CPU in Settings. Installing Python packages does not change the portable EXE.")
+    return ("Install a CUDA/Vulkan/Metal-enabled llama-cpp-python runtime with install-model-runtime.py "
+            "or select Auto/CPU in Settings.")
+
+
 def _run(command: list[str]) -> str:
     return subprocess.check_output(command, text=True, timeout=8, stderr=subprocess.DEVNULL,
                                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).strip()
@@ -258,7 +290,7 @@ def model_guidance(model_id: str, hw: dict[str, Any], runtime: dict[str, Any], c
     else:
         fit = "Likely to fit in RAM. CPU review is likely usable" + (" but slow on this CPU." if (hw.get("threads") or 0) < 4 else "; smaller models generally respond sooner.")
     if mode == "gpu" and not runtime["gpu"]:
-        fit = "GPU mode cannot run with the current runtime. Install a GPU build or select Auto/CPU. " + fit
+        fit = "GPU mode cannot run with the current runtime. " + gpu_runtime_help() + " " + fit
     elif gpu_enabled and gpu_memory < required + 0.5:
         fit += " GPU memory is insufficient or unknown; try partial layers. Auto can fall back to CPU if GPU loading fails."
     if not runtime["installed"]:

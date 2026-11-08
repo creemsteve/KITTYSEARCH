@@ -39,7 +39,7 @@ class KittySearchWindow(ModelSettingsMixin):
         header = ttk.Frame(shell)
         header.pack(fill="x", pady=(0, 12))
         ttk.Label(header, text="KITTYSEARCH", style="Brand.TLabel").pack(side="left")
-        ttk.Label(header, text="Local search", style="Hint.TLabel").pack(side="left", padx=24)
+        ttk.Label(header, text="Local clawing", style="Hint.TLabel").pack(side="left", padx=24)
         ttk.Separator(shell).pack(fill="x", pady=(0, 16))
         self.footer = ttk.Label(shell, text=f"Data and settings: {core.data_dir()}", style="Hint.TLabel", anchor="w")
         self.footer.pack(side="bottom", fill="x", pady=(10, 0))
@@ -49,8 +49,8 @@ class KittySearchWindow(ModelSettingsMixin):
         self.settings_tab = ttk.Frame(self.tabs, padding=(16, 24))
         self.searxng_tab = ttk.Frame(self.tabs, padding=16)
         self.learning_tab = ttk.Frame(self.tabs, padding=(16, 24))
-        self.tabs.add(self.search_tab, text="Search")
-        self.tabs.add(self.learning_tab, text="Learning")
+        self.tabs.add(self.search_tab, text="Claw")
+        self.tabs.add(self.learning_tab, text="Pawprints")
         self.tabs.add(self.settings_tab, text="Settings")
         self.tabs.add(self.searxng_tab, text="SearXNG settings")
         self._build_search()
@@ -60,15 +60,15 @@ class KittySearchWindow(ModelSettingsMixin):
 
     def _build_search(self) -> None:
         f = self.search_tab
-        ttk.Label(f, text="Search with receipts.", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(f, text="SearXNG results reviewed by your local AI model.", style="Hint.TLabel").pack(anchor="w", pady=(2, 12))
+        ttk.Label(f, text="Claw up some answers.", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Sniff out pages with SearXNG, then let your local AI model review them.", style="Hint.TLabel").pack(anchor="w", pady=(2, 12))
         row = ttk.Frame(f)
         row.pack(fill="x")
         self.query = tk.StringVar()
         self.query_entry = ttk.Entry(row, textvariable=self.query)
         self.query_entry.pack(side="left", fill="x", expand=True)
         self.query_entry.bind("<Return>", lambda _e: self._search())
-        self.search_button = ttk.Button(row, text="Search", command=self._search, style="Primary.TButton", width=12)
+        self.search_button = ttk.Button(row, text="Claw!", command=self._search, style="Primary.TButton", width=12)
         self.search_button.pack(side="left")
         controls = ttk.Frame(f)
         controls.pack(fill="x", pady=9)
@@ -95,7 +95,7 @@ class KittySearchWindow(ModelSettingsMixin):
         yscroll.pack(side="right", fill="y")
         self.result_tree.bind("<<TreeviewSelect>>", self._show_result)
         details = ttk.Frame(body)
-        ttk.Label(details, text="Source details", style="Section.TLabel").pack(anchor="w", pady=(8, 8))
+        ttk.Label(details, text="Catch details", style="Section.TLabel").pack(anchor="w", pady=(8, 8))
         self.result_detail = tk.Text(details, height=5, wrap="word", state="disabled",
                                      font=("IBM Plex Sans", 10), background=COLORS["layer"],
                                      foreground=COLORS["text"], insertbackground=COLORS["text"],
@@ -106,7 +106,7 @@ class KittySearchWindow(ModelSettingsMixin):
         self.result_detail.pack(fill="both", expand=True)
         actions = ttk.Frame(details)
         actions.pack(fill="x", pady=(5, 0))
-        self.open_result_button = ttk.Button(actions, text="Open selected source", command=self._open_result, state="disabled")
+        self.open_result_button = ttk.Button(actions, text="Open selected page", command=self._open_result, state="disabled")
         self.open_result_button.pack(side="left")
         self.page_flag_button = ttk.Button(actions, text="Flag page as AI", command=lambda: self._flag_result("page"), state="disabled")
         self.page_flag_button.pack(side="left", padx=(8, 0))
@@ -117,8 +117,8 @@ class KittySearchWindow(ModelSettingsMixin):
 
     def _build_learning(self) -> None:
         f = self.learning_tab
-        ttk.Label(f, text="Learn from your flags", style="Title.TLabel").pack(anchor="w")
-        ttk.Label(f, text="Saved flags lower result rankings and follow the Hide AI option on every search. "
+        ttk.Label(f, text="Your saved pawprints", style="Title.TLabel").pack(anchor="w")
+        ttk.Label(f, text="Saved flags lower page rankings and follow the Hide AI option on every new claw. "
                   "They stay on this device; the model is not retrained. Website flags cover the exact host, "
                   "across all pages, but not other subdomains.", style="Hint.TLabel", wraplength=700).pack(anchor="w", pady=(8, 16))
         ttk.Label(f, text="Flag a page or website by URL", style="Section.TLabel").pack(anchor="w")
@@ -162,7 +162,7 @@ class KittySearchWindow(ModelSettingsMixin):
             for target in sorted(flags[scope]):
                 self.feedback_tree.insert("", "end", values=(scope, target))
         count = sum(len(entries) for entries in flags.values())
-        self.learning_status.configure(text=f"{count} saved AI flag{'s' if count != 1 else ''} · Changes apply immediately and on future searches.")
+        self.learning_status.configure(text=f"{count} saved AI flag{'s' if count != 1 else ''} · Changes apply immediately and on future claws.")
         core.apply_feedback(self.results, flags)
         self._render_results()
         return True
@@ -219,7 +219,7 @@ class KittySearchWindow(ModelSettingsMixin):
         self.searxng_sections = ttk.Notebook(outer)
         self.searxng_sections.pack(fill="both", expand=True)
         sections = {}
-        for name in ("Connection", "Search options", "Engines", "Sites"):
+        for name in ("Connection", "Claw options", "Engines", "Sites"):
             sections[name] = ttk.Frame(self.searxng_sections, padding=12)
             self.searxng_sections.add(sections[name], text=name)
 
@@ -244,7 +244,7 @@ class KittySearchWindow(ModelSettingsMixin):
                   "http://127.0.0.1:8080. Timeout range: 1–300 seconds.", style="Hint.TLabel", wraplength=650
                   ).grid(row=3, column=0, columnspan=2, sticky="w")
 
-        f = sections["Search options"]
+        f = sections["Claw options"]
         f.columnconfigure(1, weight=1)
         self.searxng_language = tk.StringVar(value=self.cfg.get("language", "all"))
         ttk.Label(f, text="Language", style="Section.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 12))
@@ -263,7 +263,7 @@ class KittySearchWindow(ModelSettingsMixin):
                                               style="Hint.TLabel", wraplength=650)
         self.searxng_category_hint.grid(row=3, column=0, columnspan=2, sticky="w", pady=(0, 8))
         ttk.Label(f, text="Language accepts codes such as en-US; all means all languages. SafeSearch works with supporting engines. "
-                  "Server rules can override search preferences. Use these controls instead of !engine or :language query shortcuts.",
+                  "Server rules can override claw preferences. Use these controls instead of !engine or :language shortcuts in your claw.",
                   style="Hint.TLabel", wraplength=650).grid(row=4, column=0, columnspan=2, sticky="w")
 
         f = sections["Engines"]
@@ -318,7 +318,7 @@ class KittySearchWindow(ModelSettingsMixin):
             return
         url = settings["searxng_url"]
         self.load_engines_button.configure(state="disabled")
-        self.searxng_status.configure(text="Loading engines and categories…")
+        self.searxng_status.configure(text="Sniffing out engines and categories…")
         def run() -> None:
             catalog, error = None, None
             try:
@@ -346,7 +346,7 @@ class KittySearchWindow(ModelSettingsMixin):
             if engine["name"] in selected:
                 self.searxng_engine_tree.selection_add(iid)
         self.searxng_category_hint.configure(text="Available categories: " + ", ".join(catalog["categories"]))
-        self.searxng_status.configure(text=f"Loaded {len(catalog['engines'])} engines. Select engines and click Use selected, then save.")
+        self.searxng_status.configure(text=f"Found {len(catalog['engines'])} engines. Select engines and click Use selected, then save.")
 
     def _use_selected_searxng_engines(self) -> None:
         if self._engine_catalog_url != self.searxng_url.get().strip().rstrip("/"):
@@ -442,10 +442,10 @@ class KittySearchWindow(ModelSettingsMixin):
     def _search(self) -> None:
         query = self.query.get().strip()
         if not query:
-            self.search_status.configure(text="Enter a search query.")
+            self.search_status.configure(text="Enter a topic to sniff out.")
             return
         self.search_button.configure(state="disabled")
-        self.search_status.configure(text="Searching and reviewing sources locally…")
+        self.search_status.configure(text="Clawing and reviewing sources locally…")
         cfg = self.cfg.copy()
         def run() -> None:
             try:
@@ -466,10 +466,10 @@ class KittySearchWindow(ModelSettingsMixin):
             model_note += f" · {data['model_runtime']}"
         if data.get("domain_filtered"):
             model_note += f" · {data['domain_filtered']} excluded by domain filters"
-        self.search_status.configure(text=f"{len(self.results)} results · {model_note}" + (f" · {data['model_error']}" if data["model_error"] else ""))
+        self.search_status.configure(text=f"{len(self.results)} catches · {model_note}" + (f" · {data['model_error']}" if data["model_error"] else ""))
         # Reload on completion to include flags changed while inference was running.
         if not self._refresh_learning():
-            self.search_status.configure(text="Search complete, but saved AI flags could not be loaded. See Learning.")
+            self.search_status.configure(text="Claw complete, but saved AI flags could not be loaded. See Pawprints.")
             self._render_results()
 
     def _render_results(self) -> None:

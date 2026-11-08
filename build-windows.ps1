@@ -2,9 +2,10 @@ param(
     [string]$Python = 'python',
     [string]$SearXNGBranch = 'master',
     [ValidateSet('cpu', 'cuda', 'vulkan')]
-    [string]$InferenceBackend = 'cpu',
+    [string]$InferenceBackend = 'vulkan',
     [ValidateSet('cu118', 'cu121', 'cu122', 'cu123', 'cu124', 'cu125', 'cu130', 'cu132')]
-    [string]$CudaVersion = 'cu124'
+    [string]$CudaVersion = 'cu124',
+    [string]$DistDirectory = 'dist'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -72,7 +73,8 @@ import site
 
 # SearXNG is licensed under AGPL-3.0-or-later. Ship its corresponding source
 # beside the executable as well as embedding the runnable files in the EXE.
-$Dist = Join-Path $PSScriptRoot 'dist'
+$Dist = if ([System.IO.Path]::IsPathRooted($DistDirectory)) { $DistDirectory } else { Join-Path $PSScriptRoot $DistDirectory }
+$Dist = [System.IO.Path]::GetFullPath($Dist)
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 $SourceNotice = Join-Path $Source 'LICENSE'
 if (-not (Test-Path -LiteralPath $SourceNotice)) { throw 'SearXNG source archive has no LICENSE file.' }
@@ -85,7 +87,18 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not install the selected inference backe
 if ($LASTEXITCODE -ne 0) { throw 'Could not install PyInstaller.' }
 & $PythonExe -m PyInstaller --noconfirm --clean --onefile --name KITTYSEARCH --windowed --distpath $Dist --workpath $BuildRoot --specpath $BuildRoot --collect-all llama_cpp --add-data "$BundleRoot;searxng-runtime" --add-data "$(Join-Path $PSScriptRoot 'assets');assets" (Join-Path $PSScriptRoot 'kittysearch.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
-& $PythonExe (Join-Path $PSScriptRoot 'package-windows.py') --backend $InferenceBackend --searxng-ref $SearXNGBranch
+Write-Host 'Checking the inference backend inside the finished portable EXE...'
+$RuntimeReport = Join-Path $Dist 'runtime-check.json'
+if (Test-Path -LiteralPath $RuntimeReport) { Remove-Item -LiteralPath $RuntimeReport -Force }
+$CheckProcess = Start-Process -FilePath (Join-Path $Dist 'KITTYSEARCH.exe') -ArgumentList @('runtime-check', '--backend', $InferenceBackend, '--output', "`"$RuntimeReport`"") -WindowStyle Hidden -PassThru
+if (-not $CheckProcess.WaitForExit(120000)) {
+    $CheckProcess.Kill()
+    throw 'Portable inference runtime check timed out.'
+}
+if ($CheckProcess.ExitCode -ne 0 -or -not (Test-Path -LiteralPath $RuntimeReport)) {
+    throw "Portable inference runtime check failed. See $RuntimeReport; the release will not be packaged."
+}
+& $PythonExe (Join-Path $PSScriptRoot 'package-windows.py') --backend $InferenceBackend --cuda-version $CudaVersion --searxng-ref $SearXNGBranch --dist $Dist
 if ($LASTEXITCODE -ne 0) { throw 'Portable release packaging failed.' }
-Write-Host 'Portable executable created at dist\KITTYSEARCH.exe (SearXNG runtime is embedded).'
-Write-Host 'Distribute dist\KITTYSEARCH-Windows-x64-portable.zip; it includes the executable, licenses, corresponding source, and checksums.'
+Write-Host "Portable executable created at $Dist\KITTYSEARCH.exe (SearXNG runtime is embedded)."
+Write-Host 'Distribute the backend-labelled portable ZIP printed above; it includes the executable, licenses, corresponding source, and checksums.'

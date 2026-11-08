@@ -1,6 +1,6 @@
 # KITTYSEARCH
 
-KITTYSEARCH is a native desktop app and CLI for SearXNG. It can run a local GGUF language model directly inside the application to score relevance and source quality and flag pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the app has an option to hide flagged results.
+KITTYSEARCH is a native desktop app for SearXNG. It can run a local GGUF language model directly inside the application to score relevance and source quality and flag pages that show evidence of generative-AI authorship. Results are ranked, not silently discarded; the app has an option to hide flagged results.
 
 This repository is distributed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
 
@@ -26,7 +26,7 @@ python kittysearch.py
 python3 kittysearch.py
 ```
 
-The native window includes Search, Learning, Settings (local AI model), and SearXNG settings tabs. Close the window to stop KITTYSEARCH.
+The native window includes Claw, Pawprints, Settings (local AI model), and SearXNG settings tabs. Close the window to stop KITTYSEARCH.
 
 The GUI uses [IBM Carbon's Gray 100 dark theme](https://carbondesignsystem.com/building-blocks/foundations/themes/overview) and bundled IBM Plex Sans Regular, SemiBold, and Italic fonts. Source runs and portable Windows/Linux builds load the fonts privately for the application; no font installation or runtime download is required. Font files and their SIL Open Font License are included in `assets/fonts` (see its provenance README).
 
@@ -44,16 +44,9 @@ The SearXNG settings tab also includes:
 
 Domain rules filter results locally before applying the result limit and running AI review. Saved rules also filter currently displayed results; run a new search to restore results after loosening a rule. They do **not** prevent SearXNG from contacting sites or fetching resources. Enforce network access policies in the server or firewall. Use the settings controls instead of `!engine`, `!!` redirect, or `:language` query shortcuts, which KITTYSEARCH rejects so they cannot override saved choices. Settings files from the earlier connection-only interface are loaded with general search, all languages, Moderate SafeSearch, server-default engines, and no domain filters.
 
-Local model and acceleration choices are saved separately in `kittysearch-data/desktop-model.json`. The desktop app does not import the CLI configuration or settings saved by older versions.
+Local model and acceleration choices are saved separately in `kittysearch-data/desktop-model.json`. The desktop app does not import settings saved by older versions.
 
 For Windows source installations, run `./setup-searxng-windows.ps1` first. The portable Windows build includes SearXNG. SearXNG does not officially support native Windows.
-
-The command line retains its independent `kittysearch-data/config.json` and supports `KITTYSEARCH_HOME`, `KITTYSEARCH_SEARXNG_URL`, and `KITTYSEARCH_MODEL_PATH`. Commands include:
-
-```bash
-python kittysearch.py doctor
-python kittysearch.py search "how do heat pumps work" --limit 10
-```
 
 SearXNG's `search.formats` setting must include `html` and `json`; some default setups disable JSON. Point KITTYSEARCH at the SearXNG base URL (not `/search`). SearXNG documents its [HTTP Search API](https://docs.searxng.org/dev/search_api) and [container setup](https://docs.searxng.org/admin/installation-docker). For example, in a SearXNG settings file:
 
@@ -78,7 +71,7 @@ Enable **kitty mode :3** in **Settings**, then click **Use model & save settings
 
 When running from source, install the inference runtime in the same Python environment with `python -m pip install -r requirements-model.txt`. The packaged builds include the runtime. The model evaluates snippets, not full pages; check its scores and reasons against the sources.
 
-For GPU acceleration, install a matching runtime and restart KITTYSEARCH (a CPU-only runtime cannot enable GPU offload through a setting):
+When running from source, install a matching GPU runtime and restart KITTYSEARCH (a CPU-only runtime cannot enable GPU offload through a setting):
 
 ```powershell
 python install-model-runtime.py --backend vulkan
@@ -88,21 +81,33 @@ python install-model-runtime.py --backend cuda --cuda-version cu130
 
 The installer selects prebuilt wheels from the [llama-cpp-python backend indexes](https://llama-cpp-python.readthedocs.io/en/latest/) and fails if no matching wheel exists for your Python/platform. Vulkan supports compatible NVIDIA, AMD and Intel graphics; CUDA requires compatible NVIDIA hardware and drivers. On macOS, `--backend metal` is available. `--backend cpu` restores the CPU runtime. Source builds of additional backends can follow the upstream instructions.
 
-Portable builds default to CPU for compatibility. To include a GPU runtime on Windows, run `./build-windows.ps1 -InferenceBackend vulkan` or `./build-windows.ps1 -InferenceBackend cuda -CudaVersion cu130`. On Linux, run `KITTYSEARCH_INFERENCE_BACKEND=vulkan ./build-linux.sh`; CUDA builds also accept `KITTYSEARCH_CUDA_VERSION=cu130`. Build in a dedicated Python environment because backend selection replaces its inference runtime.
+Windows portable builds include Vulkan GPU support by default, for compatible NVIDIA, AMD, and Intel graphics. Keep the graphics driver up to date; Python and the Vulkan SDK are not required. Auto can retry model loading on CPU, but the Vulkan runtime still requires a Vulkan-capable graphics driver to load. For computers without that driver, build with `./build-windows.ps1 -InferenceBackend cpu`. NVIDIA-specific builds can use `./build-windows.ps1 -InferenceBackend cuda -CudaVersion cu130 -DistDirectory dist/cuda`. CUDA wheels must support the target GPU architecture and driver; CUDA 13 supports compute capability 7.5 or newer, including RTX 50-series GPUs. CUDA 12 wheels cover older supported GPUs but may not support newer architectures. Build in a dedicated Python environment because backend selection replaces its inference runtime. Use separate output directories when building multiple variants.
+
+Earlier portable releases included only the CPU runtime. If one reports **GPU offload is unavailable**, select **Auto** or **CPU only** in Settings and save, or replace the EXE with a GPU-enabled portable build. Keep `kittysearch-data` to preserve settings and models. Installing `llama-cpp-python` on the host does not change the embedded runtime. `START-HERE.txt` and `build-info.json` identify the backend included in a release.
+
+On Windows, the CUDA installer also stages NVIDIA's matching cuBLAS runtime DLLs and license alongside the inference library, so the portable CUDA build includes those dependencies. A compatible NVIDIA driver is still required; the full CUDA Toolkit is not.
+
+Linux standalone builds default to CPU. For Vulkan, run `KITTYSEARCH_INFERENCE_BACKEND=vulkan ./build-linux.sh`; CUDA builds also accept `KITTYSEARCH_CUDA_VERSION=cu130`. These builds do not create the Windows release ZIP. See [BUILDING.md](BUILDING.md) for Linux and macOS commands and current packaging limits.
 
 ## Build a portable Windows EXE
 
-Run the build script on Windows with 64-bit Python 3.11 or 3.12 and internet access:
+For complete source-build instructions covering Windows, Linux, and macOS, see [BUILDING.md](BUILDING.md). Only the Windows build currently creates the portable release package.
+
+Run the build script on Windows with 64-bit Python 3.11 or 3.12 and internet access. Build in a dedicated virtual environment because selecting a backend replaces its inference runtime:
 
 ```powershell
-.\build-windows.ps1
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+.\build-windows.ps1 -Python .\.venv\Scripts\python.exe -InferenceBackend vulkan -DistDirectory dist/vulkan
 ```
 
-The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KITTYSEARCH.exe`. The complete release is `dist\KITTYSEARCH-Windows-x64-portable.zip`: it includes the EXE, licenses, corresponding KITTYSEARCH and SearXNG source archives, instructions, build metadata, and SHA256 checksums. Personal settings, learning flags, and downloaded models are excluded from release archives.
+The build downloads SearXNG source, applies the Windows compatibility patch, installs its dependencies into an embedded Python runtime, and packages all of that into `dist\KITTYSEARCH.exe`. It verifies the selected inference backend both after installation and inside the finished EXE; a missing or incorrect backend stops packaging. The runtime check and bundled native library names are recorded in `build-info.json`. Release ZIPs identify their backend, such as `KITTYSEARCH-Windows-x64-vulkan-portable.zip`, `KITTYSEARCH-Windows-x64-cuda-cu130-portable.zip`, or `KITTYSEARCH-Windows-x64-cpu-portable.zip`. Each includes the EXE, licenses, corresponding KITTYSEARCH and SearXNG source archives, instructions, build metadata, and SHA256 checksums. Personal settings, learning flags, and downloaded models are excluded from release archives.
 
 Extract the ZIP to a writable folder and run `KITTYSEARCH.exe`; it opens a native desktop window without a browser. The EXE has no installer and no Python, Docker, or WSL prerequisite. Settings, downloaded models, and logs are written to `kittysearch-data` alongside it. Close KITTYSEARCH before moving it, and move that data folder with the EXE to preserve your setup. Keep the corresponding source archives with any redistributed executable. The build script works from any current directory; use `-Python .\.venv\Scripts\python.exe` to build with the project's virtual environment.
 
 The portable EXE includes the local inference runtime; model weights are downloaded separately using the button in Settings. The native SearXNG build tracks upstream `master` by default; pass `-SearXNGBranch` to select another branch. PyInstaller builds are platform-specific: build the Windows EXE on Windows and a Linux binary on Linux.
+
+Agent build and release requirements are maintained in [AGENTS.md](AGENTS.md). To check an extracted release without opening the GUI, run `KITTYSEARCH.exe runtime-check --backend vulkan --output runtime-check.json` (use `cuda` or `cpu` for those variants). Add `--model "C:\path\to\model.gguf"` to test actual model loading and a short generation. The JSON report records success or failure; GPU tests use explicit offload without CPU fallback.
 
 ## Notes on AI-authorship screening
 
@@ -116,4 +121,4 @@ The **Learning** tab lists all saved flags, lets you flag a URL directly, and le
 
 Page flags match the URL path and query, ignoring fragments, host capitalization, and default ports. Website flags match the exact hostname across HTTP/HTTPS and ports; they do not include other subdomains (`www.example.com` and `example.com` are separate). A website flag covers every page on that host, so use a page flag for a single article.
 
-Flags are personal preferences stored in `kittysearch-data/learning.sqlite3` (or `KITTYSEARCH_HOME`), shared by desktop and CLI searches. They are never uploaded and do not retrain the local language model.
+Flags are personal preferences stored in `kittysearch-data/learning.sqlite3`. They are never uploaded and do not retrain the local language model.

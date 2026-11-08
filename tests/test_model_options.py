@@ -146,6 +146,12 @@ class RuntimeOptionsTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "GPU offload is unavailable"):
             core.get_local_model(dict(self.cfg, model_acceleration="gpu"))
 
+    def test_portable_gpu_error_explains_that_host_pip_cannot_update_exe(self):
+        self.runtime.llama_supports_gpu_offload.return_value = False
+        with patch.object(core.sys, "frozen", True, create=True):
+            with self.assertRaisesRegex(RuntimeError, "Vulkan or CUDA portable build.*Installing Python packages does not change"):
+                core.get_local_model(dict(self.cfg, model_acceleration="gpu"))
+
     def test_auto_gpu_failure_retries_cpu_once_and_reports_fallback(self):
         self.runtime.Llama.side_effect = [RuntimeError("out of VRAM"), Mock()]
         core.get_local_model(self.cfg)
