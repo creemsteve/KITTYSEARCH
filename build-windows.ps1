@@ -53,7 +53,7 @@ GIT_BRANCH = $BranchLiteral
 Write-Host 'Installing SearXNG dependencies for the embedded runtime...'
 & $PythonExe -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw 'Could not upgrade pip.' }
-& $PythonExe -m pip install --target $PackageRoot -r (Join-Path $Source 'requirements.txt')
+& $PythonExe -m pip install --no-compile --target $PackageRoot -r (Join-Path $Source 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Could not install SearXNG dependencies.' }
 
 Write-Host "Downloading embeddable CPython $Version..."
@@ -85,6 +85,8 @@ Write-Host 'Building the one-file KITTYSEARCH executable with SearXNG included..
 if ($LASTEXITCODE -ne 0) { throw 'Could not install the selected inference backend.' }
 & $PythonExe -m pip install -r (Join-Path $PSScriptRoot 'requirements-build.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Could not install PyInstaller.' }
+& $PythonExe (Join-Path $PSScriptRoot 'optimize-windows-runtime.py') $BundleRoot
+if ($LASTEXITCODE -ne 0) { throw 'Could not optimize the portable runtime.' }
 & $PythonExe -m PyInstaller --noconfirm --clean --onefile --name KITTYSEARCH --windowed --distpath $Dist --workpath $BuildRoot --specpath $BuildRoot --collect-all llama_cpp --add-data "$BundleRoot;searxng-runtime" --add-data "$(Join-Path $PSScriptRoot 'assets');assets" (Join-Path $PSScriptRoot 'kittysearch.py')
 if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed.' }
 Write-Host 'Checking the inference backend inside the finished portable EXE...'

@@ -81,7 +81,7 @@ class PortableWindowsTests(unittest.TestCase):
             (root / "dist").mkdir()
             for name in ("KITTYSEARCH.exe", "SearXNG-source.zip"):
                 (root / "dist" / name).write_bytes(b"build artifact")
-            for name in ("LICENSE", "README.md", "AGENTS.md", "kittysearch.py", "build-windows.ps1", "requirements-build.txt"):
+            for name in ("LICENSE", "README.md", "BUILDING.md", "AGENTS.md", "kittysearch.py", "build-windows.ps1", "requirements-build.txt"):
                 (root / name).write_text("source", encoding="utf-8")
             (root / "kittysearch-data").mkdir()
             (root / "kittysearch-data/secret.json").write_text("personal", encoding="utf-8")
@@ -100,6 +100,7 @@ class PortableWindowsTests(unittest.TestCase):
             with zipfile.ZipFile(root / "dist/KITTYSEARCH-source.zip") as archive:
                 self.assertIn("KITTYSEARCH/kittysearch.py", archive.namelist())
                 self.assertIn("KITTYSEARCH/AGENTS.md", archive.namelist())
+                self.assertIn("KITTYSEARCH/BUILDING.md", archive.namelist())
                 self.assertFalse(any("kittysearch-data" in name for name in archive.namelist()))
             with patch.object(packaging, "ROOT", root):
                 with self.assertRaisesRegex(ValueError, "must pass runtime-check"):

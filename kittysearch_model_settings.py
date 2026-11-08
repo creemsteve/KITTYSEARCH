@@ -97,6 +97,15 @@ class ModelSettingsMixin:
             self.model_field_entries[key] = entry
         hint("Auto tries GPU offload and falls back to CPU if loading fails. GPU mode requires a compatible runtime and driver. "
              "Reduce GPU layers if video memory is tight. Device numbers follow the inference runtime's order.")
+        ttk.Label(f, text="Search depth", style="Section.TLabel").pack(anchor="w", pady=(8, 0))
+        self.depth_choices = core.pages.DEPTH_LABELS
+        self.search_depth = tk.StringVar(value=next(label for label, key in self.depth_choices.items()
+                                                   if key == self.cfg.get("search_depth", "snippets")))
+        self.depth_picker = ttk.Combobox(f, textvariable=self.search_depth, values=list(self.depth_choices), state="readonly")
+        self.depth_picker.pack(fill="x", pady=(6, 0))
+        hint("Snippets uses search previews only. Page reads up to 6,000 characters per result; Deep reads up to 24,000. "
+             "Page and Deep contact result websites directly and take longer. The local model reviews text in passages; "
+             "blocked, unsupported or unreadable pages use snippets. Save to apply to the next claw.")
         self.kitty_mode = tk.BooleanVar(value=self.cfg.get("kitty_mode", False))
         self.kitty_mode_toggle = ttk.Checkbutton(f, text="kitty mode :3", variable=self.kitty_mode)
         self.kitty_mode_toggle.pack(anchor="w", pady=(4, 0))
@@ -129,7 +138,8 @@ class ModelSettingsMixin:
 
     def _model_form_settings(self):
         values = dict(self.cfg, model_id=self._selected_model_id(), model_path=self.custom_model_path.get(),
-                      model_acceleration=self.acceleration_modes[self.acceleration.get()], kitty_mode=self.kitty_mode.get())
+                      model_acceleration=self.acceleration_modes[self.acceleration.get()], kitty_mode=self.kitty_mode.get(),
+                      search_depth=self.depth_choices[self.search_depth.get()])
         values.update({key: var.get().strip() for key, var in self.model_fields.items()})
         return models.validate_settings(core.data_dir(), values)
 
@@ -184,6 +194,7 @@ class ModelSettingsMixin:
         self.custom_model_entry.configure(state="disabled" if busy else "normal")
         self.save_model_button.configure(state="disabled" if busy else "normal")
         self.kitty_mode_toggle.configure(state="disabled" if busy else "normal")
+        self.depth_picker.configure(state="disabled" if busy else "readonly")
         self.acceleration_picker.configure(state="disabled" if busy else "readonly")
         for entry in self.model_field_entries.values():
             entry.configure(state="disabled" if busy else "normal")

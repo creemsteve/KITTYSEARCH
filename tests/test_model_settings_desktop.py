@@ -87,6 +87,36 @@ class DesktopModelTests(unittest.TestCase):
         self.assertEqual((self.home / "desktop-model.json").read_bytes(), before)
         self.assertIn("not saved", self.app.model_settings_status.cget("text"))
 
+    def test_depth_selection_applies_after_save_and_survives_restart(self):
+        self.app.search_depth.set("Deep (24,000 characters)")
+        self.assertEqual(self.app.cfg["search_depth"], "snippets")
+        self.app.save_model_button.invoke()
+        self.assertEqual(self.app.cfg["search_depth"], "deep")
+        self.assertEqual(core.automatic_config()["search_depth"], "deep")
+        self.app._set_download_busy(True)
+        self.assertTrue(self.app.depth_picker.instate(["disabled"]))
+        self.app._set_download_busy(False)
+        self.assertTrue(self.app.depth_picker.instate(["readonly"]))
+
+    def test_result_details_report_page_coverage_truncation_and_failure(self):
+        item = dict(url="https://example.org", title="Source", content="Preview", kitty_score=70,
+                    kitty_relevance=80, kitty_ai_reviewed=True, kitty_ai_generated=False, kitty_reasons=["Usable content"],
+                    kitty_page_text="Page text", kitty_page_reviewed_chars=5, kitty_page_truncated=True,
+                    kitty_page_url="https://example.org/final")
+        data = dict(results=[item], analyzed=True, model="fake.gguf", model_error=None,
+                    search_depth="deep", pages_retrieved=1, page_errors=0)
+        self.app._search_done(data, None)
+        self.app.result_tree.selection_set("0")
+        self.app._show_result()
+        detail = self.app.result_detail.get("1.0", "end")
+        self.assertIn("5 of 9 retrieved characters reviewed", detail)
+        self.assertIn("partial view", detail)
+        self.assertIn("https://example.org/final", detail)
+        self.assertIn("1 pages retrieved", self.app.search_status.cget("text"))
+        item.update(kitty_page_text="", kitty_page_error="Timed out")
+        self.app._show_result()
+        self.assertIn("snippet review only: Timed out", self.app.result_detail.get("1.0", "end"))
+
     def test_busy_download_locks_choice_and_failure_restores_controls(self):
         self.app._set_download_busy(True)
         self.assertTrue(self.app.model_picker.instate(["disabled"]))

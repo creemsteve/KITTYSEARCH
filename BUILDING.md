@@ -47,6 +47,8 @@ The script downloads SearXNG source, applies the Windows compatibility patch, bu
 
 The resulting ZIP is labelled by backend: `KITTYSEARCH-Windows-x64-vulkan-portable.zip`, `KITTYSEARCH-Windows-x64-cuda-cu130-portable.zip`, or `KITTYSEARCH-Windows-x64-cpu-portable.zip`. CUDA builds also include NVIDIA's matching cuBLAS DLLs and license. GPU drivers are end-user prerequisites; users do not need Python, a compiler, or a GPU SDK.
 
+To reduce package size, the Windows build skips dependency bytecode compilation and removes cached bytecode when its Python source is present. It also removes build-only linker libraries and debug symbols from the dedicated environment's `llama_cpp/lib` directory before collection. Runtime DLLs, cuBLAS, licenses, package data, and source archives are retained, and `--collect-all llama_cpp` and the finished EXE backend check remain required. Release ZIPs use maximum Deflate compression.
+
 Vulkan is the Windows default for compatible NVIDIA, AMD, and Intel graphics. CUDA is for compatible NVIDIA GPUs; select a wheel version supported by the target GPU architecture and driver. CUDA 13 supports compute capability 7.5 or newer, including RTX 50-series GPUs. CPU builds do not support GPU offload. Do not build multiple variants into the same output directory.
 
 Before publishing a Windows release, follow the release checks in [AGENTS.md](AGENTS.md): run the unit suite, inspect ZIP contents and checksums, and run the extracted EXE's runtime check from a clean directory. If compatible hardware and a GGUF model are available, smoke-test actual GPU loading and generation as described there. Do not publish or replace release assets without authorization.

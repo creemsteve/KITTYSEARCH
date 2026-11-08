@@ -21,9 +21,11 @@ class KittySearchWindow(ModelSettingsMixin):
         self._service_busy = False
         self._closing = False
         self.results: list[dict[str, Any]] = []
+        self.overview: dict[str, Any] | None = None
+        self.overview_error: str | None = None
         self.root.title(f"{core.APP_NAME} {core.VERSION}")
         self.root.geometry("1120x820")
-        self.root.minsize(820, 640)
+        self.root.minsize(820, 700)
         self._style()
         self._build()
         self._start_managed_service()
@@ -78,9 +80,26 @@ class KittySearchWindow(ModelSettingsMixin):
         self.health.pack(side="right")
         self.search_status = ttk.Label(f, text="", style="Hint.TLabel", anchor="w")
         self.search_status.pack(fill="x", pady=(0, 6))
+        f.bind("<Configure>", lambda event: self.search_status.configure(wraplength=max(300, event.width)))
         ttk.Label(f, text="AI flags are estimates, not proof of authorship.", style="Hint.TLabel").pack(side="bottom", anchor="w", pady=(7, 0))
         body = ttk.Panedwindow(f, orient="vertical")
         body.pack(fill="both", expand=True)
+        self.result_views = ttk.Notebook(body)
+        overview = ttk.Frame(self.result_views, padding=(0, 8))
+        self.overview_tab = overview
+        ttk.Label(overview, text="General overview", style="Section.TLabel").pack(anchor="w", pady=(0, 8))
+        overview_text = ttk.Frame(overview)
+        overview_text.pack(fill="both", expand=True)
+        self.overview_detail = tk.Text(overview_text, height=6, wrap="word", state="disabled",
+                                      font=("IBM Plex Sans", 10), background=COLORS["layer"],
+                                      foreground=COLORS["text"], selectbackground=COLORS["selection"],
+                                      selectforeground=COLORS["text"], relief="flat", borderwidth=0,
+                                      padx=16, pady=12, highlightthickness=1,
+                                      highlightbackground=COLORS["border"], highlightcolor=COLORS["focus"])
+        overview_scroll = ttk.Scrollbar(overview_text, orient="vertical", command=self.overview_detail.yview)
+        self.overview_detail.configure(yscrollcommand=overview_scroll.set)
+        self.overview_detail.pack(side="left", fill="both", expand=True)
+        overview_scroll.pack(side="right", fill="y")
         listing = ttk.Frame(body)
         cols = ("score", "relevance", "title", "source")
         self.result_tree = ttk.Treeview(listing, columns=cols, show="headings", selectmode="browse", height=4)
@@ -94,7 +113,8 @@ class KittySearchWindow(ModelSettingsMixin):
         self.result_tree.pack(side="left", fill="both", expand=True)
         yscroll.pack(side="right", fill="y")
         self.result_tree.bind("<<TreeviewSelect>>", self._show_result)
-        details = ttk.Frame(body)
+        details = ttk.Frame(self.result_views)
+        self.details_tab = details
         ttk.Label(details, text="Catch details", style="Section.TLabel").pack(anchor="w", pady=(8, 8))
         self.result_detail = tk.Text(details, height=5, wrap="word", state="disabled",
                                      font=("IBM Plex Sans", 10), background=COLORS["layer"],
@@ -103,17 +123,25 @@ class KittySearchWindow(ModelSettingsMixin):
                                      relief="flat", borderwidth=0, padx=16, pady=12,
                                      highlightthickness=1, highlightbackground=COLORS["border"],
                                      highlightcolor=COLORS["focus"])
-        self.result_detail.pack(fill="both", expand=True)
+        detail_text = ttk.Frame(details)
+        detail_text.pack(fill="both", expand=True)
+        detail_scroll = ttk.Scrollbar(detail_text, orient="vertical", command=self.result_detail.yview)
+        self.result_detail.configure(yscrollcommand=detail_scroll.set)
+        self.result_detail.pack(in_=detail_text, side="left", fill="both", expand=True)
+        detail_scroll.pack(side="right", fill="y")
         actions = ttk.Frame(details)
-        actions.pack(fill="x", pady=(5, 0))
+        actions.pack(side="bottom", fill="x", pady=(5, 0), before=detail_text)
         self.open_result_button = ttk.Button(actions, text="Open selected page", command=self._open_result, state="disabled")
         self.open_result_button.pack(side="left")
         self.page_flag_button = ttk.Button(actions, text="Flag page as AI", command=lambda: self._flag_result("page"), state="disabled")
         self.page_flag_button.pack(side="left", padx=(8, 0))
         self.website_flag_button = ttk.Button(actions, text="Flag website as AI", command=lambda: self._flag_result("website"), state="disabled")
         self.website_flag_button.pack(side="left", padx=(8, 0))
+        self.result_views.add(overview, text="General overview")
+        self.result_views.add(details, text="Catch details")
         body.add(listing, weight=3)
-        body.add(details, weight=1)
+        body.add(self.result_views, weight=1)
+        self._render_overview()
 
     def _build_learning(self) -> None:
         f = self.learning_tab
@@ -376,7 +404,12 @@ class KittySearchWindow(ModelSettingsMixin):
         self.searxng_language.set(settings["language"])
         self.searxng_allowed_domains.set(", ".join(settings["allowed_domains"]))
         self.searxng_blocked_domains.set(", ".join(settings["blocked_domains"]))
-        self.results = core.searxng.filter_results(self.results, settings)
+        filtered_results = core.searxng.filter_results(self.results, settings)
+        if len(filtered_results) != len(self.results):
+            self.overview = None
+            self.overview_error = "Domain filters changed. Search again for an updated overview."
+            self._render_overview()
+        self.results = filtered_results
         self._render_results()
         self.searxng_status.configure(text="Settings saved. Applying connection…")
         self._start_managed_service(restart=restart)
@@ -445,7 +478,10 @@ class KittySearchWindow(ModelSettingsMixin):
             self.search_status.configure(text="Enter a topic to sniff out.")
             return
         self.search_button.configure(state="disabled")
-        self.search_status.configure(text="Clawing and reviewing sources locally…")
+        self.search_status.configure(text="Clawing, reviewing, and summarizing sources locally…")
+        self.overview = None
+        self.overview_error = "Preparing an overview for this search…"
+        self._render_overview()
         cfg = self.cfg.copy()
         def run() -> None:
             try:
@@ -459,18 +495,59 @@ class KittySearchWindow(ModelSettingsMixin):
         self.search_button.configure(state="normal")
         if error:
             self.search_status.configure(text=error)
+            self.overview = None
+            self.overview_error = "Overview unavailable because the search failed."
+            self._render_overview()
             return
         self.results = core.searxng.filter_results(data["results"], core.searxng.normalize_options(self.cfg))
+        self.overview = data.get("overview")
+        self.overview_error = data.get("overview_error")
+        if len(self.results) != len(data["results"]):
+            self.overview = None
+            self.overview_error = "Domain filters changed. Search again for an updated overview."
+        elif not self.results:
+            self.overview_error = "No pages found to summarize."
+        elif not self.overview and not self.overview_error and data.get("model_error"):
+            self.overview_error = "General overview unavailable: " + data["model_error"]
+        self._render_overview()
+        self.result_views.select(self.overview_tab)
         model_note = f"Reviewed by {data['model']}" if data["analyzed"] else "Lexical ranking only"
         if data.get("model_runtime"):
             model_note += f" · {data['model_runtime']}"
         if data.get("domain_filtered"):
             model_note += f" · {data['domain_filtered']} excluded by domain filters"
+        if data.get("search_depth", "snippets") != "snippets":
+            model_note += f" · {data.get('pages_retrieved', 0)} pages retrieved"
+            if data.get("page_errors"):
+                model_note += f" · {data['page_errors']} pages unavailable (using snippets)"
         self.search_status.configure(text=f"{len(self.results)} catches · {model_note}" + (f" · {data['model_error']}" if data["model_error"] else ""))
         # Reload on completion to include flags changed while inference was running.
         if not self._refresh_learning():
             self.search_status.configure(text="Claw complete, but saved AI flags could not be loaded. See Pawprints.")
             self._render_results()
+
+    def _render_overview(self) -> None:
+        widget = self.overview_detail
+        widget.configure(state="normal")
+        widget.delete("1.0", "end")
+        for tag in widget.tag_names():
+            if tag.startswith("source_"):
+                widget.tag_delete(tag)
+        if self.overview:
+            widget.insert("end", self.overview["text"] + "\n\n")
+            widget.insert("end", f"Based on findings from {self.overview['reviewed']} of {self.overview['total']} results; "
+                          "snippets or partial page passages. May include hidden AI-flagged results.\n\n")
+            for source in self.overview["sources"]:
+                tag = "source_" + source["id"]
+                widget.insert("end", f"[{source['id']}] {source['title']} — {source['url']}\n", tag)
+                widget.tag_configure(tag, underline=True, foreground=COLORS["link"])
+                widget.tag_bind(tag, "<Button-1>", lambda _e, url=source["url"]: webbrowser.open(url))
+                widget.tag_bind(tag, "<Enter>", lambda _e: widget.configure(cursor="hand2"))
+                widget.tag_bind(tag, "<Leave>", lambda _e: widget.configure(cursor="xterm"))
+        else:
+            widget.insert("end", self.overview_error or "Search with a local model to see a general overview of the findings.")
+        widget.configure(state="disabled", cursor="xterm")
+        widget.yview_moveto(0)
 
     def _render_results(self) -> None:
         selection = self.result_tree.selection()
@@ -501,10 +578,23 @@ class KittySearchWindow(ModelSettingsMixin):
         if not selection:
             return
         item = self.visible_results.get(selection[0], {})
+        self.result_views.select(self.details_tab)
         lines = [item.get("title", ""), item.get("url", ""), "", item.get("content", "No snippet supplied."), "", f"Quality {item.get('kitty_score', 0)}/100 · Relevance {item.get('kitty_relevance', 0)}/100", ""]
+        if item.get("kitty_summary"):
+            lines[3:3] = [f"Page overview [{item['kitty_source_id']}]:", item["kitty_summary"], "", "Search snippet:"]
         lines.extend("• " + reason for reason in item.get("kitty_reasons", []))
         if item.get("kitty_ai_reviewed"):
             lines.append(f"Local model confidence: {item.get('kitty_ai_confidence', 0)}%")
+        if item.get("kitty_page_text"):
+            text = item["kitty_page_text"]
+            lines.extend(["", f"Page text: {item.get('kitty_page_reviewed_chars', 0):,} of {len(text):,} retrieved characters reviewed.",
+                          "Ranking uses the strongest reviewed passage." if item.get("kitty_ai_reviewed") else "Lexical ranking used; model review unavailable.",
+                          f"Retrieved from: {item.get('kitty_page_url', item.get('url', ''))}"])
+            if item.get("kitty_page_truncated"):
+                lines.append("Retrieval limit reached; this is a partial view of the page.")
+            lines.extend(["", "Retrieved text preview:", text[:1200]])
+        elif item.get("kitty_page_error"):
+            lines.extend(["", "Page unavailable; snippet review only: " + item["kitty_page_error"]])
         self.result_detail.configure(state="normal")
         self.result_detail.delete("1.0", "end")
         self.result_detail.insert("1.0", "\n".join(lines))

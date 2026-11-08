@@ -70,13 +70,13 @@ def package(backend: str, searxng_ref: str, dist: Path | None = None, cuda_versi
     # Explicit source roots keep local settings, flags, downloaded weights,
     # environments, credentials, and build output out of public releases.
     sources = [p for p in ROOT.iterdir() if p.is_file() and (
-        p.suffix in (".py", ".ps1", ".sh") or p.name in ("README.md", "AGENTS.md", "LICENSE")
+        p.suffix in (".py", ".ps1", ".sh") or p.name in ("README.md", "BUILDING.md", "AGENTS.md", "LICENSE")
         or (p.name.startswith("requirements-") and p.suffix == ".txt"))]
     for directory in (ROOT / "assets", ROOT / "tests"):
         sources.extend(p for p in directory.rglob("*")
                        if p.is_file() and "__pycache__" not in p.parts)
     app_source = dist / "KITTYSEARCH-source.zip"
-    with zipfile.ZipFile(app_source, "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(app_source, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in sorted(sources):
             archive.write(path, "KITTYSEARCH/" + path.relative_to(ROOT).as_posix())
 
@@ -99,7 +99,7 @@ def package(backend: str, searxng_ref: str, dist: Path | None = None, cuda_versi
     checksums.write_text("".join(f"{sha256(p)}  {p.name}\n" for p in files), encoding="utf-8")
     backend_label = f"cuda-{cuda_version}" if backend == "cuda" else backend
     output = dist / f"KITTYSEARCH-Windows-x64-{backend_label}-portable.zip"
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for path in files + [checksums]:
             archive.write(path, "KITTYSEARCH/" + path.name)
     output.with_suffix(".zip.sha256").write_text(f"{sha256(output)}  {output.name}\n", encoding="utf-8")

@@ -11,7 +11,8 @@ def response(reviews):
 
 def review(idx, **changes):
     result = {"id": str(idx), "relevance": 80, "quality": 70,
-              "ai_generated": False, "confidence": 0, "reason": "Relevant snippet"}
+              "ai_generated": False, "confidence": 0, "reason": "Relevant snippet",
+              "summary": "The page describes the topic in the query."}
     result.update(changes)
     return result
 
@@ -40,7 +41,7 @@ class LocalReviewTests(unittest.TestCase):
         self.assertIn("untrusted data", model.calls[0]["messages"][0]["content"])
         self.assertEqual(model.calls[0]["response_format"], core.review_response_format(["0", "1"]))
         self.assertEqual(model.calls[1]["response_format"], core.review_response_format(["2"]))
-        self.assertEqual(model.calls[0]["max_tokens"], 768)
+        self.assertEqual(model.calls[0]["max_tokens"], 1024)
 
     def test_generation_schema_requires_each_id_and_all_typed_fields(self):
         schema = core.review_response_format(["3", "4"])["schema"]
@@ -57,6 +58,7 @@ class LocalReviewTests(unittest.TestCase):
                 self.assertEqual(properties[field]["enum"], list(range(101)))
             self.assertEqual(properties["ai_generated"]["type"], "boolean")
             self.assertEqual(properties["reason"]["maxLength"], 180)
+            self.assertEqual(properties["summary"]["maxLength"], 500)
 
     def test_kitty_mode_directive_applies_to_every_batch_and_can_be_disabled(self):
         answers = [response([review(0), review(1)]), response([review(2)])]

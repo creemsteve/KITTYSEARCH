@@ -13,6 +13,8 @@ import subprocess
 import sys
 from typing import Any
 
+import kittysearch_pages as pages
+
 
 DEFAULT_MODEL_ID = "granite-4.2-3b"
 MODEL_CATALOG = {
@@ -24,6 +26,24 @@ MODEL_CATALOG = {
         "page": "https://huggingface.co/ibm-granite/granite-4.2-3b-GGUF",
         "memory_gib": 4.5,
         "tradeoff": "3B model: a balance of review detail and speed; slower than the 1.5B option.",
+    },
+    "granite-4.2-8b": {
+        "name": "IBM Granite 4.2 8B · Q4_K_M", "size_gb": 5.35,
+        "filename": "granite-4.2-8b-Q4_K_M.gguf",
+        "url": "https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF/resolve/baa31a42eb728f98918bbabb55bf7b955eb6daf4/granite-4.2-8b-Q4_K_M.gguf",
+        "sha256": "4730224a8cb6177b821bb9061277b997d6f75499bf2620ce7da12ba60dd9d209",
+        "page": "https://huggingface.co/ibm-granite/granite-4.2-8b-GGUF",
+        "memory_gib": 8.0,
+        "tradeoff": "8B model: a larger Granite option for more capable reviews; needs substantially more memory and runs slower, especially on CPU.",
+    },
+    "granite-4.2-30b": {
+        "name": "IBM Granite 4.2 30B · Q4_K_M", "size_gb": 18.03,
+        "filename": "granite-4.2-30b-Q4_K_M.gguf",
+        "url": "https://huggingface.co/gguf/granite-4.2-30b-GGUF/resolve/05dcd1eb5b7c15ef3920b09c9617b68140e45487/granite-4.2-30b-Q4_K_M.gguf",
+        "sha256": "9d25a62b49bf7640ec07b69104c8e13133357064c227d8cca8193e6cf59797cc",
+        "page": "https://huggingface.co/gguf/granite-4.2-30b-GGUF",
+        "memory_gib": 22.5,
+        "tradeoff": "30B model: the highest-capacity Granite option; requires a large amount of RAM or VRAM and is likely very slow on CPU.",
     },
     "qwen2.5-1.5b": {
         "name": "Qwen 2.5 1.5B Instruct · Q4_K_M", "size_gb": 1.12,
@@ -43,9 +63,27 @@ MODEL_CATALOG = {
         "memory_gib": 4.0,
         "tradeoff": "Alternative 3B instruct model; more capacity than 1.5B, with higher memory use and slower CPU review.",
     },
+    "qwen3-4b": {
+        "name": "Qwen3 4B · Q4_K_M", "size_gb": 2.50,
+        "filename": "Qwen3-4B-Q4_K_M.gguf",
+        "url": "https://huggingface.co/Qwen/Qwen3-4B-GGUF/resolve/bc640142c66e1fdd12af0bd68f40445458f3869b/Qwen3-4B-Q4_K_M.gguf",
+        "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+        "page": "https://huggingface.co/Qwen/Qwen3-4B-GGUF",
+        "memory_gib": 5.5,
+        "tradeoff": "4B instruct model with a reasoning mode; uses more memory than 3B models and may respond more slowly on CPU.",
+    },
+    "gemma-3-4b": {
+        "name": "Google Gemma 3 4B Instruct · Q4_K_M", "size_gb": 2.49,
+        "filename": "gemma-3-4b-it-Q4_K_M.gguf",
+        "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/3a679f9c5ba2732f8f6a0c1b739005e55a43a3f2/gemma-3-4b-it-Q4_K_M.gguf",
+        "sha256": "5db4147429ac073b35c67507b8b252463c8adfd44b0dc7f75608502bb78977e6",
+        "page": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF",
+        "memory_gib": 5.5,
+        "tradeoff": "Alternative 4B instruction model; uses more memory than 3B models and may respond more slowly on CPU. Gemma terms apply.",
+    },
 }
 SETTING_KEYS = ("model_id", "model_path", "model_context", "model_threads",
-                "model_gpu_layers", "model_acceleration", "model_main_gpu", "kitty_mode")
+                "model_gpu_layers", "model_acceleration", "model_main_gpu", "kitty_mode", "search_depth")
 
 
 def catalog_model_path(home: Path, model_id: str) -> Path:
@@ -81,6 +119,7 @@ def validate_settings(home: Path, cfg: dict[str, Any], *, require_file: bool = T
     if not isinstance(kitty_mode, bool):
         raise ValueError("kitty mode :3 must be enabled or disabled.")
     values["kitty_mode"] = kitty_mode
+    values["search_depth"] = pages.validate_depth(cfg.get("search_depth", "snippets"))
     model_id = cfg.get("model_id", DEFAULT_MODEL_ID)
     if model_id in MODEL_CATALOG:
         path = catalog_model_path(home, model_id)
